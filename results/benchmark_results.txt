@@ -1,0 +1,164 @@
+🔬 NEURAL EDGE DISTILLER — Before/After Benchmark
+Comparing vanilla 3B vs fine-tuned Neural Edge 3B
+
+
+============================================================
+  MODEL: Vanilla Llama 3.2 3B
+  PATH:  mlx-community/Llama-3.2-3B-Instruct-4bit
+============================================================
+Fetching 6 files: 100%|█████████████| 6/6 [00:00<00:00, 25523.15it/s]
+Download complete: : 0.00B [00:00, ?B/s]              00:00<?, ?it/s]
+
+── Prompt 1 ──────────────────────────────────────────
+Q: Kafka consumer lag spiking to 48 hours under peak load with strict per-user event ordering. Recover throughput without violating ordering constraints.
+
+QUESTION: Kafka consumer lag spiking to 48 hours under peak load with strict per-user event ordering. Recover throughput without violating ordering constraints.
+
+THOUGHT:
+1. FAILURE MODE: The root cause of the lag is the high load and the strict per-user event ordering, causing the consumer to fall behind and not be able to keep up with the producers.
+2. NAIVE FIXES: 
+   a. Increasing the number of consumers: Adding more consumers can help distribute the load, but it may not solve the underlying issue of the lag, and it could lead to a decrease in the ordering constraint.
+   b. Reducing the ordering constraint: Relaxing the ordering constraint could help reduce the lag, but it may violate the strict per-user event ordering, causing data loss or corruption.
+3. MECHANISM: 
+   a. Implementing a more efficient consumer group rebalancing mechanism: This can help reduce the lag by ensuring that the consumer group is rebalanced more frequently, allowing the consumer to catch up with the producers.
+   b. Using a more efficient offset management mechanism: This can help reduce the lag by ensuring that the consumer has the most up-to-date offsets, allowing it to start consuming from the correct position.
+4. TRADE-OFF: 
+   a. The solution may require a trade-off between throughput and ordering constraint, as increasing the efficiency of the consumer group rebalancing mechanism or offset management may require relaxing the ordering constraint.
+5. ARCHITECTURE: 
+   Consumer -> Kafka -> Producer -> Kafka -> Consumer -> Consumer Group Manager -> ZooKeeper
+END_OF_ARCH
+
+⏱  Time: 7.07s | Tokens/sec: 34.7 | Format: ✅ Structured
+
+── Prompt 2 ──────────────────────────────────────────
+Q: P99 latency on LLM inference endpoint spiking to 30s under concurrent load. Reduce latency without scaling GPU count.
+
+QUESTION: Reduce P99 latency on LLM inference endpoint to under 30s under concurrent load without scaling GPU count.
+
+THOUGHT:
+1. FAILURE MODE: The root cause or bottleneck is inefficient memory management and data transfer between GPU and CPU, leading to excessive computation time and memory access.
+2. NAIVE FIXES: 
+   a. Increase GPU count to handle the load, which would require additional hardware and power consumption.
+   b. Use a faster GPU model, which might not be available or compatible with the current system.
+3. MECHANISM: 
+   a. Implement a more efficient memory management system, such as using a GPU-accelerated memory manager or reducing memory allocation frequency.
+   b. Optimize data transfer between GPU and CPU by using more efficient data formats, such as using tensors instead of arrays, and reducing data copying.
+4. TRADE-OFF: 
+   a. Solution a (increasing GPU count) would require significant investment in hardware and power consumption, potentially leading to increased costs and environmental impact.
+   b. Solution b (faster GPU model) might not be available or compatible, limiting scalability and flexibility.
+5. ARCHITECTURE: 
+   GPU -> Memory Manager -> CPU
+   or 
+   GPU -> Tensor Format Converter -> CPU
+
+⏱  Time: 5.79s | Tokens/sec: 32.1 | Format: ❌ Unstructured
+
+── Prompt 3 ──────────────────────────────────────────
+Q: A single malformed event repeatedly crashing Kafka consumers and blocking the entire partition from progressing. Isolate and handle poison pill messages without manual intervention or partition stall.
+
+QUESTION: Isolate and handle poison pill messages without manual intervention or partition stall in a Kafka system.
+
+THOUGHT:
+
+1. FAILURE MODE: The root cause of the issue is that a malformed event is being produced to Kafka, causing the consumers to crash and the partition to stall. This is a classic example of a "poison pill" message.
+2. NAIVE FIXES: 
+   a. Ignore the malformed event: This approach fails because it doesn't address the underlying issue and can lead to data loss. If the event is critical, ignoring it may not be acceptable.
+   b. Log the event and continue: This approach fails because it doesn't prevent the consumer from crashing and the partition from stalling. The consumer will still crash, and the partition will still be blocked.
+
+3. MECHANISM: To handle poison pill messages without manual intervention or partition stall, a precise solution is to use a combination of Kafka's built-in features and a custom application:
+   - Use a `KafkaConsumer` with a `max.poll.records` and `max.poll.interval.ms` to limit the number of records fetched and the time spent polling.
+   - Implement a custom `ConsumerInterceptor` to detect and handle malformed events.
+   - Use a `KafkaProducer` with a `retries` and `retry.backoff.ms` to handle failed events.
+   - Create a `PoisonPillDetector` that detects when a partition is stalled due to a poison pill message and triggers a rebalancing of the partition.
+
+4. TRADE-OFF: This solution costs:
+   - Increased CPU usage due to the custom application and additional polling.
+   - Additional memory usage to store the detected poison pill messages.
+
+ARCHITECTURE: 
+Consumer -> ConsumerInterceptor -> PoisonPillDetector -> KafkaConsumer -> KafkaProducer -> Broker
+ConsumerInterceptor -> KafkaConsumer -> Broker
+PoisonPillDetector -> KafkaConsumer -> Broker
+KafkaProducer -> Broker
+
+⏱  Time: 8.48s | Tokens/sec: 32.7 | Format: ❌ Unstructured
+
+============================================================
+  SUMMARY — Vanilla Llama 3.2 3B
+  Avg Tokens/sec      : 33.2
+  Peak Memory         : 12.71 GB
+  Structured responses: 1/3
+============================================================
+
+
+============================================================
+  MODEL: Neural Edge 3B (Fine-tuned)
+  PATH:  models/neural-edge-3b
+============================================================
+
+── Prompt 1 ──────────────────────────────────────────
+Q: Kafka consumer lag spiking to 48 hours under peak load with strict per-user event ordering. Recover throughput without violating ordering constraints.
+
+QUESTION: Kafka consumer lag spiking to 48 hours under peak load with strict per-user event ordering. Recover throughput without violating ordering constraints.
+THOUGHT:
+1. FAILURE MODE: Ordering constraint serialization bottleneck — strict per-user event ordering means all events for a given user must be processed sequentially by the same consumer. Under peak load, a small number of high-volume users serialize the entire partition, and lag accumulates because no parallelism is possible within a partition without breaking order.
+2. NAIVE FIXES: Adding more consumer instances to the same consumer group doesn't help because Kafka assigns one partition to one consumer at a time — extra consumers sit idle unless you add partitions. Adding more partitions breaks per-user ordering because a user's events can land on different partitions and get processed out of order by different consumers.
+3. MECHANISM: Per-user partition keying with a consumer-side ordering buffer. Repartition the topic using user ID as the partition key — this guarantees all events for a given user always land on the same partition, making parallelism safe across users. Scale partitions to match consumer count. Within each partition, a bounded in-memory buffer sequences events by user ID offset before committing, catching any cross-partition ordering edge cases at the application layer.
+4. TRADE-OFF: Repartitioning requires a topic migration — existing messages on old partitions must be drained before the new keying takes effect, creating a one-time operational window. Users with extremely high event volume still serialize their own partition, so one pathological user can still cause localized lag, requiring per-partition lag monitoring and alerting.
+ARCHITECTURE: Producer (User-ID Partition Key) -> Kafka Topic (Partitioned by User) -> Consumer Group (1 Consumer per Partition) -> Per-User Ordering Buffer -> Processing Pipeline -> Storage Layer
+END_OF_ARCH
+
+⏱  Time: 7.99s | Tokens/sec: 36.0 | Format: ✅ Structured
+
+── Prompt 2 ──────────────────────────────────────────
+Q: P99 latency on LLM inference endpoint spiking to 30s under concurrent load. Reduce latency without scaling GPU count.
+
+QUESTION: P99 latency on LLM inference endpoint spiking to 30s under concurrent load. Reduce latency without scaling GPU count.
+THOUGHT:
+1. FAILURE MODE: Concurrency-induced memory management and I/O contention — the LLM model's complex dependencies and high-frequency computations generate a large amount of intermediate results, which are then written to memory. Under concurrent load, the memory management and I/O contention cause the latency to spike.
+2. NAIVE FIXES: Adding more GPUs to the endpoint doesn't help because the bottleneck is in memory management and I/O, not compute. Distributing the load evenly among multiple GPUs still means the bottleneck is in memory and I/O.
+3. MECHANISM: Distributed caching and incremental updates — the LLM model's dependencies are complex, and its high-frequency computations generate a large amount of intermediate results. To reduce latency without scaling GPUs, the endpoint can be equipped with a distributed caching system that stores and updates the model's weights incrementally. This way, when a new request is made, it can reuse previously computed results from cache instead of recomputing them from scratch.
+4. TRADE-OFF: The distributed caching system adds a small memory footprint and requires careful configuration to balance cache hits and misses. The incremental updates mechanism increases the complexity of the system's software and hardware requirements.
+ARCHITECTURE: LLM inference endpoint -> Distributed caching system (Distributed RAM) -> LLM model
+END_OF_ARCH
+
+⏱  Time: 6.43s | Tokens/sec: 34.7 | Format: ✅ Structured
+
+── Prompt 3 ──────────────────────────────────────────
+Q: A single malformed event repeatedly crashing Kafka consumers and blocking the entire partition from progressing. Isolate and handle poison pill messages without manual intervention or partition stall.
+
+QUESTION: A single malformed event repeatedly crashing Kafka consumers and blocking the entire partition from progressing. Isolate and handle poison pill messages without manual intervention or partition stall.
+THOUGHT:
+1. FAILURE MODE: Malformed event duplication — a single bad event is being written to the partition, causing it to become stuck in an infinite loop of attempts to commit, and in turn, causing all subsequent events to be lost or corrupted.
+2. NAIVE FIXES: Adding a simple rate limiter to limit the number of attempts to commit a single event doesn't account for the fact that a malformed event can cause the partition to become stuck. Adding a simple database-based cache to store and ignore bad events fails because it creates a single point of failure and adds complexity.
+3. MECHANISM: Kafka's built-in support for a topic's minimum and maximum in-memory partitions means that a malformed event can cause the partition to become stuck in an infinite loop of attempts to commit. To handle this, a distributed rate limiter with a cache and a distributed token bucket algorithm can be used. When a bad event is detected, it is marked as such in the rate limiter cache and the token bucket is reset, allowing subsequent events to be accepted.
+4. TRADE-OFF: The distributed rate limiter with a cache and token bucket algorithm adds complexity and requires more sophisticated testing and monitoring. It also increases the latency for bad events, as they must be processed and marked as such before being accepted by subsequent events.
+ARCHITECTURE: Kafka consumer (1) -> Rate Limiter (2) -> Cache and Token Bucket (3) -> Kafka producer (4)
+END_OF_ARCH
+
+⏱  Time: 7.41s | Tokens/sec: 36.8 | Format: ✅ Structured
+
+============================================================
+  SUMMARY — Neural Edge 3B (Fine-tuned)
+  Avg Tokens/sec      : 35.9
+  Peak Memory         : 12.71 GB
+  Structured responses: 3/3
+============================================================
+
+
+============================================================
+  FINAL COMPARISON
+============================================================
+  Metric                         Vanilla 3B  Neural Edge
+  ------------------------------------------------------
+  Avg Tokens/sec                      33.2        35.9
+  Peak Memory (GB)                   12.71       12.71
+  Structured responses                  1/3          3/3
+============================================================
+
+📊 FORMAT QUALITY PER PROMPT
+------------------------------------------------------------
+  Prompt 1: Vanilla=✅  Neural Edge=✅
+  Prompt 2: Vanilla=❌  Neural Edge=✅
+  Prompt 3: Vanilla=❌  Neural Edge=✅
+------------------------------------------------------------
