@@ -1,0 +1,156 @@
+{
+    "curriculum_version": "2.0",
+    "domain": "Distributed Systems & Backend",
+    "scenarios": [
+        {
+            "id": "TH-001",
+            "title": "The Thundering Herd",
+            "focus": "Caching, Hot Keys, and Load Balancing",
+            "description": "1M concurrent users hitting a single resource. Prevent database meltdown via caching and request coalescing."
+        },
+        {
+            "id": "RB-002",
+            "title": "The Regional Blackout",
+            "focus": "Distributed Transactions & Strong Consistency",
+            "description": "Sudden failure of a primary data center. Maintain atomic transactions without double-commits."
+        },
+        {
+            "id": "CM-003",
+            "title": "The Compromised Microservice",
+            "focus": "Secrets Management & Blast Radius Containment",
+            "description": "Unauthorized access detected in a high-privilege service. Isolate and rotate without taking down dependent services."
+        },
+        {
+            "id": "BO-004",
+            "title": "The Billion Object Graveyard",
+            "focus": "Object Storage Hot Partitions & Key Distribution",
+            "description": "S3-compatible store throttling under flat key namespace at 500M objects. Eliminate hot partition bottleneck without full data migration."
+        },
+        {
+            "id": "GS-005",
+            "title": "The Ghost Session",
+            "focus": "Session Consistency & Cache Invalidation",
+            "description": "Users randomly losing sessions after partial Redis cluster migration. Guarantee session consistency across old and new store without forced re-login."
+        },
+        {
+            "id": "QP-006",
+            "title": "The Queue Tsunami",
+            "focus": "Backpressure, Consumer Lag & Ordering Guarantees",
+            "description": "Kafka consumer lag spiking to 48 hours under peak load with strict per-user event ordering. Recover throughput without violating ordering constraints."
+        },
+        {
+            "id": "SD-007",
+            "title": "The Schema Deadlock",
+            "focus": "Zero-Downtime Migrations & Dual-Write Consistency",
+            "description": "Adding a non-nullable column to a 2B-row Postgres table with live traffic. Complete migration without downtime or locking the table."
+        },
+        {
+            "id": "AI-008",
+            "title": "The Inference Wall",
+            "focus": "LLM Serving Latency & GPU Contention",
+            "description": "P99 latency on LLM inference endpoint spiking to 30s under concurrent load. Reduce latency without scaling GPU count."
+        },
+        {
+            "id": "DW-009",
+            "title": "The Dual Write Trap",
+            "focus": "Event Sourcing & Write Consistency",
+            "description": "Service writing to both PostgreSQL and Elasticsearch simultaneously causing silent data divergence under partial failures. Guarantee both stores stay consistent without synchronous dual-write."
+        },
+        {
+            "id": "RC-010",
+            "title": "The Raft Split",
+            "focus": "Consensus, Leader Election & Network Partitions",
+            "description": "Kubernetes etcd cluster losing quorum during a rolling node upgrade causing API server unavailability. Restore quorum without data loss or full cluster restart."
+        },
+        {
+            "id": "FO-011",
+            "title": "The Fan-Out Storm",
+            "focus": "Notification Delivery & Write Amplification",
+            "description": "A celebrity user with 50M followers posting content triggers a fan-out write storm that overwhelms the notification pipeline. Deliver notifications without write amplification killing the system."
+        },
+        {
+            "id": "RL-012",
+            "title": "The Rate Limit Bypass",
+            "focus": "Distributed Rate Limiting & Token Consistency",
+            "description": "API rate limiter failing to enforce limits accurately across 200 edge nodes due to lack of shared state. Enforce global rate limits without a centralized bottleneck."
+        },
+        {
+            "id": "SG-013",
+            "title": "The Saga Rollback",
+            "focus": "Distributed Sagas & Compensating Transactions",
+            "description": "Multi-step checkout saga partially completing — payment charged but inventory not reserved — leaving users in inconsistent state. Guarantee saga atomicity across services without 2PC."
+        },
+        {
+            "id": "CD-014",
+            "title": "The Cold Start Cliff",
+            "focus": "Serverless Scaling & Latency Spikes",
+            "description": "Serverless inference endpoints experiencing 8-12 second cold start latency on first request after idle period. Eliminate cold start penalty without keeping instances permanently warm."
+        },
+        {
+            "id": "VE-015",
+            "title": "The Vector Explosion",
+            "focus": "Vector Search Scalability & ANN Index Freshness",
+            "description": "Vector similarity search degrading to 4 second latency at 500M embeddings with real-time index updates. Maintain sub-100ms search with high-frequency embedding updates."
+        },
+        {
+            "id": "TW-016",
+            "title": "The Time Warp",
+            "focus": "Clock Skew & Distributed Event Ordering",
+            "description": "Distributed financial ledger recording transactions out of causal order due to clock skew across nodes causing incorrect balance calculations. Enforce causal ordering without relying on synchronized clocks."
+        },
+        {
+            "id": "BP-017",
+            "title": "The Backfill Bomb",
+            "focus": "Large Scale Data Backfills & Live Traffic Isolation",
+            "description": "Backfilling 10 years of historical data into a new analytics column while live OLTP queries are running causing I/O saturation and query timeouts. Complete backfill without impacting live traffic."
+        },
+        {
+            "id": "MC-018",
+            "title": "The Microservice Maze",
+            "focus": "Service Mesh Observability & Latency Attribution",
+            "description": "P95 API latency spiking to 3 seconds across a 40-service mesh with no clear bottleneck visible in individual service metrics. Identify and resolve the latency source without instrumenting every service manually."
+        },
+        {
+            "id": "GC-019",
+            "title": "The GC Pause Cliff",
+            "focus": "JVM Tuning & Latency Tail Spikes",
+            "description": "Java-based trading system experiencing 500ms stop-the-world GC pauses causing missed SLA windows during peak market hours. Eliminate GC-induced latency spikes without rewriting in a non-GC language."
+        },
+        {
+            "id": "MV-020",
+            "title": "The Multi-Version Minefield",
+            "focus": "API Versioning & Backward Compatibility",
+            "description": "Breaking API change deployed to production while 30% of mobile clients still on old version causing silent data corruption on older clients. Support both versions simultaneously without forking the entire service."
+        },
+        {
+            "id": "PG-021",
+            "title": "The Poison Pill",
+            "focus": "Message Queue Fault Isolation & Dead Letter Handling",
+            "description": "A single malformed event repeatedly crashing Kafka consumers and blocking the entire partition from progressing. Isolate and handle poison pill messages without manual intervention or partition stall."
+        },
+        {
+            "id": "SS-022",
+            "title": "The Snapshot Storm",
+            "focus": "Database Backup & PITR Under Load",
+            "description": "Nightly RDS snapshot causing 40% read latency increase due to I/O contention during peak traffic hours in Asia-Pacific. Complete backups without impacting read performance during business hours."
+        },
+        {
+            "id": "TL-023",
+            "title": "The Token Leak",
+            "focus": "OAuth Token Lifecycle & Revocation at Scale",
+            "description": "Compromised OAuth tokens remaining valid for hours after user-initiated logout due to stateless JWT verification with no revocation mechanism. Enforce immediate token revocation without abandoning stateless auth."
+        },
+        {
+            "id": "HW-024",
+            "title": "The Hot Write Partition",
+            "focus": "Time-Series Write Scaling & Partition Strategy",
+            "description": "Time-series metrics database experiencing hot partition writes because all current-timestamp data lands on the same shard. Distribute write load evenly without sacrificing time-range query performance."
+        },
+        {
+            "id": "EP-025",
+            "title": "The Eventual Consistency Trap",
+            "focus": "Read-Your-Writes & Replication Lag UX",
+            "description": "Users updating their profile and immediately seeing stale data because read replicas are 2-3 seconds behind the primary. Guarantee read-your-writes consistency without routing all reads to the primary."
+        }
+    ]
+}

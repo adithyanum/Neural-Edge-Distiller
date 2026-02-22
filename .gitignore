@@ -1,0 +1,25 @@
+# --- AI/ML Specific ---
+# Never push raw model weights (GBs of data)
+models/
+huggingface/
+.cache/huggingface/
+
+# --- Environment & Virtualization ---
+distiller_env/
+venv/
+.env
+__pycache__/
+*.py[cod]
+*.pyc
+
+# --- Data & Outputs ---
+# Keep your raw curriculum but hide the massive synthetic generations
+data/training/
+plots/*.png
+benchmark_results.txt
+
+# --- OS & IDE Junk ---
+.DS_Store
+.vscode/
+.idea/
+EOF
