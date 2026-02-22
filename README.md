@@ -22,8 +22,8 @@ Neural_Edge_Distiller/
 │   ├── raw/
 │   │   └── curriculum_goals.json  # 25 distillation scenarios
 │   └── training/
-│       ├── train.jsonl            # Training split (20 entries)
-│       └── valid.jsonl            # Validation split (5 entries)
+│       ├── train.jsonl            # Training split (20 entries)  --| generated with 
+│       └── valid.jsonl            # Validation split (5 entries) --|           prepare_data_.py
 ├── models/
 │   ├── adapters/                  # LoRA adapter weights
 │   └── neural-edge-3b/            # Fused fine-tuned model
