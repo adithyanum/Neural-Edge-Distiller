@@ -1,6 +1,6 @@
 # --- AI/ML Specific ---
 # Never push raw model weights (GBs of data)
-models/
+**/models/
 huggingface/
 .cache/huggingface/
 
@@ -14,9 +14,8 @@ __pycache__/
 
 # --- Data & Outputs ---
 # Keep your raw curriculum but hide the massive synthetic generations
-data/training/
+**/data/training/
 plots/*.png
-benchmark_results.txt
 
 # --- OS & IDE Junk ---
 .DS_Store
