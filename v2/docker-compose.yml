@@ -3,6 +3,9 @@ services:
     build: ./services/gateway
     ports:
       - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
 
   redis:
     image: redis:7-alpine
@@ -12,3 +15,15 @@ services:
   worker:
     build: ./services/worker
     shm_size: "3gb"
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nova
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: neural_edge
+    ports:
+      - "5432:5432"
