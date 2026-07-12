@@ -1,8 +1,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import uuid
+import redis
+import json
 
 app = FastAPI(title="Neural Edge Distiller — Control Plane")
+
+redis_client = redis.Redis(host="redis", port=6379, decode_responses=True)
+
 
 @app.get("/health")
 def health():
@@ -17,9 +22,14 @@ class ExperimentCreate(BaseModel):
 @app.post("/experiments")
 def create_experiment(experiment: ExperimentCreate):
     experiment_id = str(uuid.uuid4())
-    return {
+
+    job = {
         "id": experiment_id,
         "name": experiment.name,
         "description": experiment.description,
-        "status": "created"
+        "status": "queued"
     }
+
+    redis_client.lpush("training_jobs", json.dumps(job))
+
+    return job
