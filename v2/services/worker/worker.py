@@ -3,18 +3,24 @@ import json
 import time
 import ray
 import psycopg2
+from services.training import TrainingService
+from services.status import ExperimentStatus
+from config import settings
 
 ray.init()
 
-redis_client = redis.Redis(host="redis", port=6379, decode_responses=True)
+redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
+training_service = TrainingService()
+
 
 def get_db_connection():
     return psycopg2.connect(
-        host="postgres",
-        dbname="neural_edge",
-        user="nova",
-        password="devpassword"
+        host=settings.postgres_host,
+        dbname=settings.postgres_db,
+        user=settings.postgres_user,
+        password=settings.postgres_password
     )
+
 
 def update_status(experiment_id, status, mark_completed=False):
     conn = get_db_connection()
@@ -37,14 +43,18 @@ def update_status(experiment_id, status, mark_completed=False):
 @ray.remote
 def run_training_job(job):
     print(f"[TRAINING STARTED] {job['name']} ({job['id']})")
-    update_status(job["id"], "training")
+    update_status(job["id"], ExperimentStatus.TRAINING)
 
-    time.sleep(5)  # placeholder — real training goes here later
+    try:
+        result = training_service.train(job)
+        update_status(job["id"], ExperimentStatus.COMPLETED, mark_completed=True)
+        print(f"[TRAINING COMPLETE] {job['name']} ({job['id']})")
+        return result
 
-    update_status(job["id"], "completed", mark_completed=True)
-    print(f"[TRAINING COMPLETE] {job['name']} ({job['id']})")
-    return job["id"]
-
+    except Exception as e:
+        print(f"[TRAINING FAILED] {job['name']} ({job['id']}) — {e}")
+        update_status(job["id"], ExperimentStatus.FAILED, mark_completed=True)
+        return None
 
 
 print("Worker started. Watching queue: training_jobs")

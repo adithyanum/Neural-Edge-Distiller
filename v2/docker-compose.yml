@@ -6,6 +6,8 @@ services:
     depends_on:
       - postgres
       - redis
+    env_file:
+      - .env
 
   redis:
     image: redis:7-alpine
@@ -18,6 +20,8 @@ services:
     depends_on:
       - postgres
       - redis
+    env_file:
+      - .env
 
   postgres:
     image: postgres:16-alpine

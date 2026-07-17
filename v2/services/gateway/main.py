@@ -4,17 +4,19 @@ import uuid
 import redis
 import json
 import psycopg2
+from config import settings
+
 
 app = FastAPI(title="Neural Edge Distiller — Control Plane")
 
-redis_client = redis.Redis(host="redis", port=6379, decode_responses=True)
+redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
 
 def get_db_connection():
     return psycopg2.connect(
-        host="postgres",
-        dbname="neural_edge",
-        user="nova",
-        password="devpassword"
+        host=settings.postgres_host,
+        dbname=settings.postgres_db,
+        user=settings.postgres_user,
+        password=settings.postgres_password
     )
 
 
