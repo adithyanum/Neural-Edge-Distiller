@@ -20,18 +20,32 @@ services:
     depends_on:
       - postgres
       - redis
+      - mlflow
     env_file:
       - .env
 
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: nova
-      POSTGRES_PASSWORD: devpassword
-      POSTGRES_DB: neural_edge
+    env_file:
+      - .env
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --allowed-hosts "mlflow:5000,localhost:5000,localhost:5001"
+      
 volumes:
   postgres_data:
+  mlflow_data:

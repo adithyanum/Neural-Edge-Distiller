@@ -21,3 +21,4 @@ plots/*.png
 .DS_Store
 .vscode/
 .idea/
+hf_token.txt

@@ -3,6 +3,7 @@ import json
 import time
 import ray
 import psycopg2
+import mlflow
 from services.training import TrainingService
 from services.status import ExperimentStatus
 from config import settings
@@ -10,7 +11,6 @@ from config import settings
 ray.init()
 
 redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
-training_service = TrainingService()
 
 
 def get_db_connection():
@@ -39,14 +39,24 @@ def update_status(experiment_id, status, mark_completed=False):
     cur.close()
     conn.close()
 
+mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
 @ray.remote
 def run_training_job(job):
     print(f"[TRAINING STARTED] {job['name']} ({job['id']})")
     update_status(job["id"], ExperimentStatus.TRAINING)
 
+    training_service = TrainingService() 
+
     try:
         result = training_service.train(job)
+
+        with mlflow.start_run(run_name=job["name"]):
+            mlflow.log_param("experiment_id", job["id"])
+            mlflow.log_metric("final_loss", result["final_loss"] or 0)
+            if result.get("adapter_path"):
+                mlflow.log_artifact(result["adapter_path"])
+
         update_status(job["id"], ExperimentStatus.COMPLETED, mark_completed=True)
         print(f"[TRAINING COMPLETE] {job['name']} ({job['id']})")
         return result
@@ -65,4 +75,3 @@ while True:
     print(f"[PICKED UP] {job['name']}")
 
     future = run_training_job.remote(job)
-    ray.get(future)

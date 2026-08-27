@@ -1,0 +1,75 @@
+.
+├── datasets
+│   ├── final
+│   │   ├── all.jsonl
+│   │   ├── classification.jsonl
+│   │   ├── code_debugging.jsonl
+│   │   ├── code_generation.jsonl
+│   │   ├── data_transformation.jsonl
+│   │   ├── information_extraction.jsonl
+│   │   ├── instruction_following.jsonl
+│   │   ├── logical_reasoning.jsonl
+│   │   ├── math_reasoning.jsonl
+│   │   ├── planning.jsonl
+│   │   └── question_answering.jsonl
+│   ├── generated
+│   │   ├── SCHEMA_METADATA.md
+│   │   ├── classification.jsonl
+│   │   ├── code_debugging.jsonl
+│   │   ├── code_generation.jsonl
+│   │   ├── data_transformation.jsonl
+│   │   ├── information_extraction.jsonl
+│   │   ├── instruction_following.jsonl
+│   │   ├── logical_reasoning.jsonl
+│   │   ├── math_reasoning.jsonl
+│   │   ├── planning.jsonl
+│   │   └── question_answering.jsonl
+│   ├── judged
+│   │   ├── SCHEMA_METADATA.md
+│   │   ├── classification.jsonl
+│   │   ├── code_debugging.jsonl
+│   │   ├── code_generation.jsonl
+│   │   ├── data_transformation.jsonl
+│   │   ├── information_extraction.jsonl
+│   │   ├── instruction_following.jsonl
+│   │   ├── logical_reasoning.jsonl
+│   │   ├── math_reasoning.jsonl
+│   │   ├── planning.jsonl
+│   │   └── question_answering.jsonl
+│   └── seeds
+│       ├── SCHEMA_METADATA.md
+│       ├── classification.jsonl
+│       ├── code_debugging.jsonl
+│       ├── code_generation.jsonl
+│       ├── data_transformation.jsonl
+│       ├── information_extraction.jsonl
+│       ├── instruction_following.jsonl
+│       ├── logical_reasoning.jsonl
+│       ├── math_reasoning.jsonl
+│       ├── planning.jsonl
+│       └── question_answering.jsonl
+├── docker-compose.yml
+├── scripts
+│   ├── __pycache__
+│   │   ├── generation_engine.cpython-312.pyc
+│   │   └── run_judge.cpython-312.pyc
+│   ├── assemble_final.py
+│   ├── generate_dataset.py
+│   ├── generation_engine.py
+│   └── run_judge.py
+├── services
+│   ├── gateway
+│   │   ├── Dockerfile
+│   │   ├── config.py
+│   │   ├── main.py
+│   │   └── requirements.txt
+│   └── worker
+│       ├── Dockerfile
+│       ├── config.py
+│       ├── kaggle_scripts
+│       ├── requirements.txt
+│       ├── services
+│       └── worker.py
+└── structure1.txt
+
+13 directories, 60 files

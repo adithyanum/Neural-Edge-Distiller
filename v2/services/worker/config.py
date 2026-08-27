@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     postgres_password: str
     redis_host: str
     redis_port: int
+    kaggle_username: str
+    kaggle_key: str
+    mlflow_tracking_uri: str
 
     class Config:
         env_file = ".env"
