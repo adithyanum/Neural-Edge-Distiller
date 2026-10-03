@@ -2,8 +2,11 @@ import os
 import json
 import shutil
 import tempfile
+from pathlib import Path
 from kaggle.api.kaggle_api_extended import KaggleApi
+from azure.storage.blob import BlobServiceClient
 from services.training_backend import TrainingBackend
+from config import settings
 
 
 # Path to the real training script, shipped alongside this file.
@@ -20,6 +23,13 @@ DATASET_SLUG = os.environ.get("DISTILLER_DATASET_SLUG", "novaadi01/neural-edge-d
 # token lives as the sole file in a small private Kaggle Dataset, attached
 # like any other dataset_source, and train.py reads it from the mounted path.
 HF_TOKEN_DATASET_SLUG = os.environ.get("HF_TOKEN_DATASET_SLUG", "novaadi01/hf-secrets")
+
+# Adapters are pushed to Azure Blob Storage after every successful run, since
+# serving will also live on Azure (single-cloud - avoids cross-cloud egress
+# costs and a second set of credentials just for artifact storage). Requires
+# AZURE_STORAGE_CONNECTION_STRING to be set in the worker's environment
+# (Azure Portal -> Storage Account -> Access keys -> Connection string).
+AZURE_BLOB_CONTAINER = os.environ.get("AZURE_BLOB_CONTAINER", "distiller-adapters")
 
 
 class KaggleBackend(TrainingBackend):
@@ -98,7 +108,57 @@ class KaggleBackend(TrainingBackend):
         with open(os.path.join(output_dir, "metrics.json")) as f:
             metrics = json.load(f)
 
+        adapter_path = os.path.join(output_dir, "adapter_output")
+
+        blob_prefix = self._upload_adapter_to_blob(adapter_path, external_job_id)
+
         return {
             "final_loss": metrics.get("final_loss"),
-            "adapter_path": os.path.join(output_dir, "adapter_output"),
+            "adapter_path": adapter_path,
+            "adapter_blob_prefix": blob_prefix,
         }
+
+    def _upload_adapter_to_blob(self, adapter_path: str, external_job_id: str) -> str | None:
+        """
+        Push the adapter to Azure Blob Storage so it's durably stored and
+        accessible outside this worker's local disk/tempdir. Keyed by the
+        Kaggle external_job_id so every run's adapter is kept, not
+        overwritten - lets you compare adapters across runs later.
+
+        Failure here doesn't fail the whole training job - a missing/mis-
+        configured connection string shouldn't turn a successful training
+        run into a reported failure. It's logged clearly instead so it's
+        obviously visible in the worker logs, not silently swallowed.
+        """
+        conn_str = settings.azure_storage_connection_string
+        if not conn_str:
+            print("[KaggleBackend] azure_storage_connection_string not set - "
+                  "skipping adapter upload, adapter only exists in local tempdir.")
+            return None
+
+        try:
+            service_client = BlobServiceClient.from_connection_string(conn_str)
+            container_client = service_client.get_container_client(AZURE_BLOB_CONTAINER)
+            if not container_client.exists():
+                container_client.create_container()
+
+            slug = external_job_id.split("/")[-1]  # e.g. "distiller-train-8dc401a0"
+            blob_prefix = f"adapters/{slug}"
+
+            adapter_dir = Path(adapter_path)
+            for f in adapter_dir.rglob("*"):
+                if not f.is_file():
+                    continue
+                relative = f.relative_to(adapter_dir)
+                blob_path = f"{blob_prefix}/{relative}"
+                with open(f, "rb") as data:
+                    container_client.upload_blob(name=blob_path, data=data, overwrite=True)
+
+            print(f"[KaggleBackend] Adapter uploaded to Azure Blob: "
+                  f"{AZURE_BLOB_CONTAINER}/{blob_prefix}")
+            return blob_prefix
+
+        except Exception as e:
+            print(f"[KaggleBackend] Azure Blob upload failed (training result "
+                  f"still valid, adapter just isn't backed up): {type(e).__name__}: {e}")
+            return None

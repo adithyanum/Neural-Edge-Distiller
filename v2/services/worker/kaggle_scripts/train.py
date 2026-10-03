@@ -19,10 +19,33 @@ import os
 import subprocess
 import sys
 
+# Kaggle assigns either a T4 or a P100 for API-pushed kernels with no way to
+# request one over the other (confirmed: kernel-metadata.json / KaggleApi have
+# no accelerator field for this; that only exists in the newer kaggle-cli's
+# interactive `--accelerator` flag, not the Python API we use here).
+#
+# The preinstalled torch (2.10.0+cu128) drops Pascal (sm_60) kernels entirely
+# as of the cu128 builds (torch >=2.8) - torch.cuda.is_available() reports
+# True on a P100 but the first real CUDA op throws
+# `CUDA error: no kernel image is available for execution on the device`.
+# The Kaggle cu121 index currently exposes the 2.5.1 line for its Python 3.13
+# runtime, and that line still ships sm_60/sm_61 kernels. Reinstalling
+# unconditionally (not just when a P100 is detected) keeps this script
+# deterministic regardless of which GPU Kaggle happens to assign.
+#
+# Pinning torch alone isn't enough: transformers/peft/torchao at their latest
+# versions assume torch features that don't exist in older Torch releases
+# (e.g. torch.int1,
+# added later) - upgrading torchao to satisfy peft's version check then
+# collides with the torch pin. The fix is to pin the whole stack to versions
+# that are compatible with the 2.5.1 runtime, so nothing downstream expects
+# newer-than-2.5.1 torch internals in the first place. This also means
+# we no longer need to force-upgrade torchao at all - the matching older peft
+# doesn't carry the torchao>=0.16 check that started this chain.
 subprocess.run(
     [
         sys.executable, "-m", "pip", "install", "-q",
-        "torch==2.4.1", "torchvision==0.19.1", "torchaudio==2.4.1",
+        "torch==2.5.1",
         "--index-url", "https://download.pytorch.org/whl/cu121",
     ],
     check=True,
@@ -45,7 +68,7 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments,
     Trainer,
-    DataCollatorForLanguageModeling,
+    default_data_collator,
 )
 from peft import LoraConfig, get_peft_model
 
@@ -63,7 +86,8 @@ ADAPTER_DIR = os.path.join(OUTPUT_DIR, "adapter_output")
 METRICS_PATH = os.path.join(OUTPUT_DIR, "metrics.json")
 
 # V1: --num-layers 8 -> mlx_lm.lora applies LoRA to the last 8 transformer layers.
-
+# PEFT has no direct "last N layers" flag; we reproduce it by targeting attention
+# projections only within the last 8 decoder layers by name.
 NUM_LORA_LAYERS = 8
 LORA_R = 16
 LORA_ALPHA = 32
@@ -73,13 +97,17 @@ TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]
 LEARNING_RATE = 1e-4       
 PER_DEVICE_BATCH_SIZE = 2    
 NUM_TRAIN_EPOCHS = None       
-MAX_STEPS = 100                
+MAX_STEPS = 493          
 MAX_SEQ_LEN = 1024
 
 # Kaggle's API can't attach interactively-configured Secrets to a kernel
 # pushed programmatically, so the HF token is shipped as the sole file in a
-# small private Kaggle Dataset instead.
-
+# small private Kaggle Dataset instead (see kaggle_backend.py for why).
+#
+# NOTE: Kaggle mounts API-pushed dataset_sources at
+# /kaggle/input/datasets/<owner>/<slug>/<file>, not /kaggle/input/<slug>/<file>
+# as older docs/examples suggest - confirmed via debug run against the actual
+# mounted tree. Search recursively so this isn't sensitive to that nesting.
 def load_hf_token():
     token_paths = glob.glob("/kaggle/input/**/hf_token.txt", recursive=True)
     if not token_paths:
@@ -112,10 +140,10 @@ def load_records(path):
 
 def to_chat_text(record, tokenizer):
     """
-    Build a single training string per record using the model's chat template.
-    context (when present, e.g. classification full-example records) is folded
-    into the user turn ahead of the prompt so the model sees the same input
-    shape the judge validated against.
+    Build the training string using the model's chat template, but return the
+    prompt-only prefix too, so build_dataset can mask prompt tokens out of the
+    loss - we only want the model trained to predict the assistant's response,
+    not to "learn" to reproduce the user's prompt or template boilerplate.
     """
     user_parts = []
     if record.get("context"):
@@ -123,28 +151,52 @@ def to_chat_text(record, tokenizer):
     user_parts.append(record["prompt"])
     user_content = "\n\n".join(user_parts)
 
-    messages = [
-        {"role": "user", "content": user_content},
-        {"role": "assistant", "content": record["response"]},
-    ]
-    return tokenizer.apply_chat_template(messages, tokenize=False)
+    messages = [{"role": "user", "content": user_content}]
+    prompt_only_text = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+
+    full_messages = messages + [{"role": "assistant", "content": record["response"]}]
+    full_text = tokenizer.apply_chat_template(full_messages, tokenize=False)
+
+    return prompt_only_text, full_text
 
 
 def build_dataset(records, tokenizer):
-    texts = [to_chat_text(r, tokenizer) for r in records]
+    prompt_texts, full_texts = zip(*[to_chat_text(r, tokenizer) for r in records])
 
     def tokenize_fn(batch):
         out = tokenizer(
-            batch["text"],
+            batch["full_text"],
             truncation=True,
             max_length=MAX_SEQ_LEN,
             padding="max_length",
         )
-        out["labels"] = out["input_ids"].copy()
+        labels = [ids.copy() for ids in out["input_ids"]]
+
+        for i, prompt_text in enumerate(batch["prompt_text"]):
+            # Mask everything up to and including the prompt/template prefix -
+            # loss should only be computed on the assistant's actual response.
+            prompt_len = len(
+                tokenizer(prompt_text, truncation=True, max_length=MAX_SEQ_LEN)["input_ids"]
+            )
+            for j in range(min(prompt_len, len(labels[i]))):
+                labels[i][j] = -100
+            # Mask padding positions too, but do it via attention_mask, NOT by
+            # matching pad_token_id - pad_token_id == eos_token_id (set below),
+            # so id-matching would also mask genuine end-of-response EOS tokens
+            # and the model would never get a signal to learn to stop
+            # generating. That was the direct cause of the looping/non-
+            # terminating generations seen in the inference spot-check.
+            for j, mask_val in enumerate(out["attention_mask"][i]):
+                if mask_val == 0:
+                    labels[i][j] = -100
+
+        out["labels"] = labels
         return out
 
-    ds = Dataset.from_dict({"text": texts})
-    ds = ds.map(tokenize_fn, batched=True, remove_columns=["text"])
+    ds = Dataset.from_dict({"prompt_text": list(prompt_texts), "full_text": list(full_texts)})
+    ds = ds.map(tokenize_fn, batched=True, remove_columns=["prompt_text", "full_text"])
     return ds
 
 
@@ -238,7 +290,11 @@ def main():
         report_to=[],
     )
 
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    # Sequences are already padded to MAX_SEQ_LEN with correct labels
+    # (prompt + padding masked to -100) computed in build_dataset(). Using
+    # DataCollatorForLanguageModeling here would silently recompute and
+    # overwrite those labels from raw input_ids, undoing that masking.
+    data_collator = default_data_collator
 
     trainer = Trainer(
         model=model,

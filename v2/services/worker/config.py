@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic_settings import BaseSettings
 
 
@@ -11,6 +12,7 @@ class Settings(BaseSettings):
     kaggle_username: str
     kaggle_key: str
     mlflow_tracking_uri: str
+    azure_storage_connection_string: Optional[str] = None
 
     class Config:
         env_file = ".env"
